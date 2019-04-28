@@ -1,0 +1,110 @@
+<Queries>
+  
+<Query>
+<Type>ThreshholdCheck</Type> <!--Query type-->
+<Description>Validate registrations count for MITT event</Description> <!--Description of query-->
+<Comments>Unexpected Increment/Decrement in Registration Count</Comments><!--Comments when query fails-->
+<Upstream>SELECT COUNT (RegistrantID) FROM [EDP_EventCore].[PII].[GenericEventData] WHERE EVentName LIKE '%The tour%' AND Status = 'Registered' GROUP BY EventName ORDER BY EventName</Upstream> <!--UpStream Query-->
+<Maqmart>SELECT count(DISTINCT RegistrantID) AS [Registrations] FROM eec.GenericEventData_raw a INNER JOIN emd.DimEvent b ON a.SourceEventKey = b.EventID WHERE eventparentid = 7 AND a.STATUS = 'Registered' GROUP BY EventKey,EventName ORDER BY EventName</Maqmart> <!--MAQ Mart Query-->
+<Threshhold>50</Threshhold> <!--Threshold value in percentage-->
+<IsJobFail>1</IsJobFail> <!--1: Job fails , 0: Job will not fail-->
+</Query>
+  
+<Query>
+<Type>ThreshholdCheck</Type>
+<Description>Validate variation in response count</Description>
+<Comments>Unexpected Increment/Decrement in Response Count</Comments>
+<Upstream>SELECT COUNT(1) FROM [EDP_HUBB].[PII].[EvaluationResponses] WHERE SourceEventKey=21706</Upstream>
+<Maqmart>SELECT COUNT(1) FROM [Event Measurement Dashboard].[hub].[EvaluationResponses] WHERE SourceEventKey=21706</Maqmart>
+<Threshhold>20</Threshhold>
+<IsJobFail>1</IsJobFail>
+</Query>
+
+<Query>
+<Type>ThreshholdCheck</Type>
+<Description>Validate variation in scan count</Description>
+<Comments>Unexpected Increment/Decrement in Scan Count</Comments>
+<Upstream>SELECT COUNT(1) FROM [EDP_HUBB].[PII].[ScannedSession] WHERE SourceEventKey=21706</Upstream>
+<Maqmart>SELECT COUNT(1) FROM [Event Measurement Dashboard].[hub].[ScannedSession] WHERE SourceEventKey=21706</Maqmart>
+<Threshhold>20</Threshhold>
+<IsJobFail>1</IsJobFail>
+</Query>
+  
+<Query>
+<Type>ExpectedOutput</Type>
+<Description>Validate speaker duplicate entry</Description>
+<Comments>Duplicate Entry for Speaker</Comments>
+<Upstream>;WITH DuplicateCountCTE AS (SELECT Sessions_SpeakerId,COUNT(DISTINCT CONCAT ([FirstName],' ' ,[LastName]))AS'Count' FROM [EDP_HUBB].[PII].[Sessions_Speaker] WHERE SourceEventKey in (21641) GROUP BY Sessions_SpeakerId HAVING COUNT(DISTINCT CONCAT ([FirstName],' ' ,[LastName])) >1 ) SELECT COUNT(1) AS 'Count' FROM DuplicateCountCTE</Upstream>
+<Maqmart>NA</Maqmart>
+<ExpectedResult>0</ExpectedResult>
+<IsJobFail>1</IsJobFail>
+</Query>
+  
+<Query>
+<Type>ExpectedOutput</Type>
+<Description>Validate session duplicate entry</Description>
+<Comments>Duplicate Entry for Session</Comments>
+<Upstream>SELECT COUNT(SESSIONSID),SESSIONSID FROM EDP_Hubb.PII.[sESSIONS] where SourceEventKey IN (21706) group by SESSIONSID HAVING COUNT(SESSIONSID) >1</Upstream>
+<Maqmart>NA</Maqmart>
+<ExpectedResult>0</ExpectedResult>
+<IsJobFail>1</IsJobFail>
+</Query>
+  
+<Query>
+<Type>ExpectedOutput</Type>
+<Description>Validate Test users</Description>
+<Comments>Test user found</Comments>
+<Upstream>SELECT COUNT(RegistrantID) FROM EDP_EventCore.PII.GenericEventData WHERE [Status] = 'Registered' AND SourceEventKey = 21440 AND ( FirstName LIKE '%Test%' OR LastName LIKE '%Test%' OR Email LIKE '%Test%' )</Upstream>
+<Maqmart>NA</Maqmart>
+<ExpectedResult>0</ExpectedResult>
+<IsJobFail>1</IsJobFail>
+</Query>
+
+<Query>
+<Type>ExpectedOutput</Type>
+<Description>Validate invalid Option Value</Description>
+<Comments>Invalid option value found in Survey</Comments>
+<Upstream>;WITH CTE AS( SELECT  CASE WHEN COUNT(DISTINCT [OptionName]) = 4 THEN 'NSAT' WHEN COUNT(DISTINCT [OptionName]) = 5 THEN 'Perception' ELSE 'Others' END AS [QuestionType],EvaluationQuestionsId ,COUNT(DISTINCT [OptionName]) AS [AnswerCount] FROM [EDP_HUBB].[PII].[EvaluationQuestionAnswers] EA WHERE SourceEventKey=21705 GROUP BY EvaluationQuestionsId ) SELECT COUNT(1) FROM CTE WHERE AnswerCount NOT IN(4,5,2)</Upstream>
+<Maqmart>NA</Maqmart>
+<ExpectedResult>0</ExpectedResult>
+<IsJobFail>1</IsJobFail>
+</Query>
+
+<Query>
+<Type>ExpectedOutput</Type>
+<Description>Validate Null response for Primary Role</Description>
+<Comments>Null response found for Primary role</Comments>
+<Upstream>SELECT COUNT(1) FROM EDP_EventCore.PII.GenericEventData GED LEFT JOIN EDP_EventCore.PII.SurveyData SD ON GED.RegistrantID=SD.RegistrantID AND Text='Which most closely represents your primary discipline/role?'  WHERE Status='Registered' AND GED.SourceEventKey IN (21440) AND Response IS NULL</Upstream>
+<Maqmart>NA</Maqmart>
+<ExpectedResult>0</ExpectedResult>
+<IsJobFail>1</IsJobFail>
+</Query>
+
+<Query>
+<Type>ExpectedOutput</Type>
+<Description>Validate Registration Date</Description>
+<Comments>Incorrect Registration Date - Before Registration Starts</Comments>
+<Upstream>SELECT COUNT(1)FROM EDP_EventCore.PII.GenericEventData WHERE Confirmed &lt; '2019-02-27 00:00:00.000' AND SourceEventKey=21440 AND Status='Registered'</Upstream>
+<Maqmart>NA</Maqmart>
+<ExpectedResult>0</ExpectedResult>
+<IsJobFail>1</IsJobFail>
+</Query>
+
+<Query>
+<Type>Dimension</Type>
+<Description>Validate invalid Event Key</Description>
+<Comments>Invalid event key found</Comments>
+<Upstream>SELECT [EventKey],[EventID],[EventName] FROM [EDP_DATA].[PII].[DimEvent] WHERE EventKey IN ('300507') ORDER BY [EventKey]</Upstream>
+<Maqmart>SELECT [EventKey],[EventID],[Event] FROM [Event Measurement Dashboard].emd.DimEvent WHERE Eventkey IN (300507) ORDER BY [EventKey]</Maqmart>
+<IsJobFail>1</IsJobFail>
+</Query>
+
+<Query>
+<Type>SpellCheck</Type>
+<Description>Validate spelling for questions</Description>
+<Comments>Spelling mistakes:</Comments>
+<Upstream>SELECT DISTINCT QuestionText FROM [EDP_HUBB].[PII].[EvaluationQuestions] where SourceEventKey IN ('21704','21705','21706','21707','21708','21709','21440','21024','305157','305175','305167','305173','305160','305145','316543','316570','18707')</Upstream>
+<Maqmart>NA</Maqmart>
+<IsJobFail>0</IsJobFail>
+</Query>
+</Queries>
